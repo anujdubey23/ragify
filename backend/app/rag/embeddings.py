@@ -19,7 +19,7 @@ class EmbeddingModel:
         return cls._instance
 
     def _load_model(self):
-        if self._model is None:
+        if self._model is None and settings.EMBEDDING_PROVIDER != "openai":
             logger.info(f"Loading embedding model: '{settings.EMBEDDING_MODEL}' on device '{settings.EMBEDDING_DEVICE}'...")
             from sentence_transformers import SentenceTransformer
             self._model = SentenceTransformer(
@@ -30,6 +30,9 @@ class EmbeddingModel:
 
     @property
     def dimension(self) -> int:
+        if settings.EMBEDDING_PROVIDER == "openai":
+            # OpenAI text-embedding-3-small uses 1536 dim
+            return 1536 if "large" not in settings.EMBEDDING_MODEL else 3072
         self._load_model()
         return self._model.get_sentence_embedding_dimension()
 
@@ -40,6 +43,26 @@ class EmbeddingModel:
         """
         if not texts:
             return np.empty((0, self.dimension), dtype=np.float32)
+
+        if settings.EMBEDDING_PROVIDER == "openai":
+            import httpx
+            import os
+            api_key = settings.LLM_API_KEY or os.getenv("LLM_API_KEY", "")
+            with log_latency("OpenAI Embed texts", f"count={len(texts)}"):
+                headers = {"Authorization": f"Bearer {api_key}"}
+                payload = {
+                    "model": "text-embedding-3-small" if "text-embedding" not in settings.EMBEDDING_MODEL else settings.EMBEDDING_MODEL,
+                    "input": texts
+                }
+                with httpx.Client(timeout=30.0) as client:
+                    resp = client.post("https://api.openai.com/v1/embeddings", json=payload, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    vectors = [item["embedding"] for item in data["data"]]
+                    arr = np.array(vectors, dtype=np.float32)
+                    norms = np.linalg.norm(arr, axis=1, keepdims=True)
+                    norms[norms == 0] = 1.0
+                    return arr / norms
 
         self._load_model()
         with log_latency("Embed texts", f"count={len(texts)}"):
@@ -57,8 +80,12 @@ class EmbeddingModel:
         Embeds a user query in the exact same vector space.
         Returns a 1D float32 numpy array of shape (D,) normalized to unit length.
         """
-        self._load_model()
         cleaned_query = query.strip()
+        if settings.EMBEDDING_PROVIDER == "openai":
+            embeddings = self.embed_texts([cleaned_query])
+            return embeddings[0]
+
+        self._load_model()
         embedding = self._model.encode(
             cleaned_query,
             show_progress_bar=False,

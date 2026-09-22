@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 1024
 
     # Embedding Settings
+    EMBEDDING_PROVIDER: str = "sentence-transformers"  # "sentence-transformers" or "openai"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_DEVICE: str = "cpu"
 
