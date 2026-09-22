@@ -1,0 +1,37 @@
+[
+  {
+    "id": "q1",
+    "question": "What is the core architecture and working mechanism of a Transformer model?",
+    "expected_sources": [
+      "Attention_Is_All_You_Need.pdf",
+      "transformer_architecture.txt"
+    ],
+    "expected_answer": "The Transformer relies entirely on self-attention mechanisms to compute representations of input and output without using sequence-aligned RNNs or convolution. It uses an encoder-decoder architecture with multi-head attention and position-wise feed-forward networks."
+  },
+  {
+    "id": "q2",
+    "question": "How does backpropagation update weights in a neural network?",
+    "expected_sources": [
+      "deep_learning_basics.pdf",
+      "neural_networks.docx"
+    ],
+    "expected_answer": "Backpropagation calculates the gradient of the loss function with respect to each weight by applying the chain rule of calculus, propagating error backwards from the output layer to hidden layers to update weights using gradient descent."
+  },
+  {
+    "id": "q3",
+    "question": "What is the difference between semantic search and keyword search in RAG?",
+    "expected_sources": [
+      "rag_system_design.pdf",
+      "retrieval_architectures.txt"
+    ],
+    "expected_answer": "Semantic search converts text into dense vector embeddings to capture conceptual meaning and synonyms, whereas keyword search (BM25) matches exact lexical terms and token frequencies."
+  },
+  {
+    "id": "q4",
+    "question": "Why is cross-encoder reranking used after initial hybrid retrieval?",
+    "expected_sources": [
+      "rag_system_design.pdf"
+    ],
+    "expected_answer": "Bi-encoders compute vector embeddings independently for speed during first-stage retrieval, while a cross-encoder evaluates the query and document together with full cross-attention to score relevance with much higher precision."
+  }
+]
