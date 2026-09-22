@@ -33,6 +33,8 @@ class EmbeddingModel:
         if settings.EMBEDDING_PROVIDER == "openai":
             # OpenAI text-embedding-3-small uses 1536 dim
             return 1536 if "large" not in settings.EMBEDDING_MODEL else 3072
+        if "MiniLM" in settings.EMBEDDING_MODEL:
+            return 384
         self._load_model()
         return self._model.get_sentence_embedding_dimension()
 
