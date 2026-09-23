@@ -45,17 +45,18 @@ export default function DocumentUpload({ onUploadSuccess }) {
       setUploadQueue((prev) => [queueItem, ...prev]);
 
       try {
-        await api.uploadDocument(file, (progress) => {
+        const res = await api.uploadDocument(file, (progress) => {
           setUploadQueue((prev) =>
             prev.map((item) =>
-              item.name === file.name ? { ...item, progress, status: progress === 100 ? 'processing' : 'uploading' } : item
+              item.name === file.name ? { ...item, progress: Math.min(progress, 95), status: 'uploading' } : item
             )
           );
         });
 
+        // Upload succeeded, document is being indexed in background
         setUploadQueue((prev) =>
           prev.map((item) =>
-            item.name === file.name ? { ...item, status: 'indexed', progress: 100 } : item
+            item.name === file.name ? { ...item, status: res.document?.status === 'indexed' ? 'indexed' : 'processing', progress: 100 } : item
           )
         );
 

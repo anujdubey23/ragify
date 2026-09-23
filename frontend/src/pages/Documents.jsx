@@ -12,19 +12,24 @@ export default function Documents({ onUpdateStats }) {
 
   useEffect(() => {
     fetchDocuments();
+    // Poll every 3 seconds if any document is still processing
+    const interval = setInterval(() => {
+      fetchDocuments(false);
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) setIsLoading(true);
       const data = await api.getDocuments();
       setDocuments(data);
       onUpdateStats?.();
     } catch (err) {
       console.error('Failed to load documents:', err);
-      setErrorMessage('Could not retrieve uploaded documents list.');
+      if (showLoading) setErrorMessage('Could not retrieve uploaded documents list.');
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
