@@ -110,13 +110,15 @@ class EmbeddingModel:
 
         try:
             self._load_model()
-            embedding = self._model.encode(
-                cleaned_query,
-                show_progress_bar=False,
-                convert_to_numpy=True,
-                normalize_embeddings=True
-            )
-            return embedding.astype(np.float32)
+            if self._model is not None:
+                embedding = self._model.encode(
+                    cleaned_query,
+                    show_progress_bar=False,
+                    convert_to_numpy=True,
+                    normalize_embeddings=True
+                )
+                return embedding.astype(np.float32)
+            raise RuntimeError("Model is None")
         except Exception:
             dim = self.dimension
             vec = np.zeros(dim, dtype=np.float32)
