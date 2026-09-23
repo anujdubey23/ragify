@@ -53,14 +53,24 @@ export default function DocumentUpload({ onUploadSuccess }) {
           );
         });
 
-        // Upload succeeded, document is being indexed in background
+        // Backend now returns final status directly (indexed or failed)
+        const finalStatus = res.document?.status || 'indexed';
         setUploadQueue((prev) =>
           prev.map((item) =>
-            item.name === file.name ? { ...item, status: res.document?.status === 'indexed' ? 'indexed' : 'processing', progress: 100 } : item
+            item.name === file.name
+              ? {
+                  ...item,
+                  status: finalStatus,
+                  progress: 100,
+                  error: res.document?.error || null
+                }
+              : item
           )
         );
 
-        onUploadSuccess?.();
+        if (finalStatus === 'indexed') {
+          onUploadSuccess?.();
+        }
       } catch (err) {
         const errorDetail = err.response?.data?.detail || err.message || 'Upload failed.';
         setUploadQueue((prev) =>

@@ -82,6 +82,7 @@ def health_check():
         "status": "healthy",
         "app_name": settings.APP_NAME,
         "environment": settings.APP_ENV,
+        "embedding_provider": settings.EMBEDDING_PROVIDER,
         "embedding_model": settings.EMBEDDING_MODEL,
         "vector_store_count": rag_pipeline.vector_store.index.ntotal,
         "bm25_count": len(rag_pipeline.bm25_retriever.chunks),

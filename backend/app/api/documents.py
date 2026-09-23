@@ -2,7 +2,7 @@ import os
 import uuid
 import shutil
 from typing import List
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.app.config import settings
 from backend.app.database.database import get_db
@@ -13,31 +13,16 @@ from backend.app.utils.logging import logger
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
-def process_document_background(doc_id: str, file_path: str, filename: str):
-    """Processes, chunks, embeds, and indexes document in background or sync."""
-    from backend.app.database.database import SessionLocal
-    db = SessionLocal()
-    repo = DocumentRepository(db)
-    try:
-        chunks = rag_pipeline.ingest_document(file_path=file_path, filename=filename, document_id=doc_id)
-        repo.save_chunks(chunks)
-        repo.update_status(doc_id=doc_id, status="indexed", chunk_count=len(chunks))
-        logger.info(f"Background indexing completed for document {doc_id} ('{filename}')")
-    except Exception as e:
-        logger.error(f"Failed to process document {doc_id} ('{filename}'): {str(e)}")
-        repo.update_status(doc_id=doc_id, status="failed", error_message=str(e))
-    finally:
-        db.close()
 
 @router.post("/upload")
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     """
     Uploads a document (PDF, DOCX, TXT), validates it, stores it,
-    and initiates chunking and vector indexing.
+    and performs chunking and vector indexing synchronously.
+    With lightweight embeddings this completes in ~1-2 seconds.
     """
     content = await file.read()
     sanitized_filename = validate_uploaded_file(file, content)
@@ -62,21 +47,47 @@ async def upload_document(
         file_path=file_path
     )
 
-    # Process via background task so the HTTP response returns immediately without timing out
-    background_tasks.add_task(process_document_background, doc_id, file_path, sanitized_filename)
+    # Process synchronously — lightweight embeddings use zero RAM and are instant
+    try:
+        logger.info(f"Starting synchronous ingestion for '{sanitized_filename}' ({doc_id})...")
+        chunks = rag_pipeline.ingest_document(
+            file_path=file_path,
+            filename=sanitized_filename,
+            document_id=doc_id
+        )
+        repo.save_chunks(chunks)
+        repo.update_status(doc_id=doc_id, status="indexed", chunk_count=len(chunks))
+        logger.info(f"Indexing completed for '{sanitized_filename}': {len(chunks)} chunks")
 
-    return {
-        "message": "File uploaded successfully. Processing started in background.",
-        "document": {
-            "id": doc.id,
-            "filename": doc.filename,
-            "file_type": doc.file_type,
-            "file_size": doc.file_size,
-            "status": "processing",
-            "chunk_count": 0,
-            "created_at": doc.created_at.isoformat()
+        return {
+            "message": f"Document indexed successfully with {len(chunks)} chunks.",
+            "document": {
+                "id": doc.id,
+                "filename": doc.filename,
+                "file_type": doc.file_type,
+                "file_size": doc.file_size,
+                "status": "indexed",
+                "chunk_count": len(chunks),
+                "created_at": doc.upload_date.isoformat()
+            }
         }
-    }
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Failed to process document '{sanitized_filename}' ({doc_id}): {error_msg}")
+        repo.update_status(doc_id=doc_id, status="failed", error_message=error_msg)
+        return {
+            "message": f"Upload saved but indexing failed: {error_msg}",
+            "document": {
+                "id": doc.id,
+                "filename": doc.filename,
+                "file_type": doc.file_type,
+                "file_size": doc.file_size,
+                "status": "failed",
+                "chunk_count": 0,
+                "created_at": doc.upload_date.isoformat(),
+                "error": error_msg
+            }
+        }
 
 @router.get("")
 def list_documents(db: Session = Depends(get_db)):
