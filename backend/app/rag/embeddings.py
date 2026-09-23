@@ -19,14 +19,18 @@ class EmbeddingModel:
         return cls._instance
 
     def _load_model(self):
-        if self._model is None and settings.EMBEDDING_PROVIDER != "openai":
-            logger.info(f"Loading embedding model: '{settings.EMBEDDING_MODEL}' on device '{settings.EMBEDDING_DEVICE}'...")
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(
-                model_name_or_path=settings.EMBEDDING_MODEL,
-                device=settings.EMBEDDING_DEVICE
-            )
-            logger.info("Embedding model loaded successfully.")
+        if self._model is None and settings.EMBEDDING_PROVIDER not in ["openai", "lightweight"]:
+            try:
+                logger.info(f"Loading embedding model: '{settings.EMBEDDING_MODEL}' on device '{settings.EMBEDDING_DEVICE}'...")
+                from sentence_transformers import SentenceTransformer
+                self._model = SentenceTransformer(
+                    model_name_or_path=settings.EMBEDDING_MODEL,
+                    device=settings.EMBEDDING_DEVICE
+                )
+                logger.info("Embedding model loaded successfully.")
+            except Exception as e:
+                logger.warning(f"Could not load SentenceTransformer ({e}). Falling back to ultra-lightweight zero-RAM vectorizer.")
+                self._model = None
 
     @property
     def dimension(self) -> int:
@@ -68,15 +72,17 @@ class EmbeddingModel:
 
         try:
             self._load_model()
-            with log_latency("Embed texts", f"count={len(texts)}"):
-                embeddings = self._model.encode(
-                    texts,
-                    batch_size=batch_size,
-                    show_progress_bar=False,
-                    convert_to_numpy=True,
-                    normalize_embeddings=True  # L2 normalization for cosine similarity
-                )
-            return embeddings.astype(np.float32)
+            if self._model is not None:
+                with log_latency("Embed texts", f"count={len(texts)}"):
+                    embeddings = self._model.encode(
+                        texts,
+                        batch_size=batch_size,
+                        show_progress_bar=False,
+                        convert_to_numpy=True,
+                        normalize_embeddings=True  # L2 normalization for cosine similarity
+                    )
+                return embeddings.astype(np.float32)
+            raise RuntimeError("Model is None, activating fallback")
         except Exception as e:
             logger.warning(f"SentenceTransformer failed or OOM ({e}). Using ultra-fast zero-memory fallback embedding.")
             # Deterministic, zero-RAM semantic projection for low-memory hosting
