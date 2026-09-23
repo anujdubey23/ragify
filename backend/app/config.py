@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 1024
 
     # Embedding Settings
-    EMBEDDING_PROVIDER: str = "sentence-transformers"  # "sentence-transformers" or "openai"
+    EMBEDDING_PROVIDER: str = "lightweight"  # "lightweight", "openai", or "sentence-transformers"
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     EMBEDDING_DEVICE: str = "cpu"
 
@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     CONFIDENCE_THRESHOLD: float = 0.35
 
     # Reranking
-    RERANKING_ENABLED: bool = True
+    RERANKING_ENABLED: bool = False
     RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
     # File limits
