@@ -62,29 +62,19 @@ async def upload_document(
         file_path=file_path
     )
 
-    # Process synchronously or via background task (run synchronously to ensure immediate readiness)
-    try:
-        chunks = rag_pipeline.ingest_document(file_path=file_path, filename=sanitized_filename, document_id=doc_id)
-        repo.save_chunks(chunks)
-        repo.update_status(doc_id=doc_id, status="indexed", chunk_count=len(chunks))
-        status = "indexed"
-        chunk_count = len(chunks)
-    except Exception as e:
-        logger.error(f"Error during ingestion: {str(e)}")
-        repo.update_status(doc_id=doc_id, status="failed", error_message=str(e))
-        status = "failed"
-        chunk_count = 0
+    # Process via background task so the HTTP response returns immediately without timing out
+    background_tasks.add_task(process_document_background, doc_id, file_path, sanitized_filename)
 
     return {
-        "message": "File uploaded and processed successfully." if status == "indexed" else "File upload succeeded but indexing encountered an issue.",
+        "message": "File uploaded successfully. Processing started in background.",
         "document": {
             "id": doc.id,
             "filename": doc.filename,
             "file_type": doc.file_type,
             "file_size": doc.file_size,
-            "status": status,
-            "chunk_count": chunk_count,
-            "upload_date": doc.upload_date.isoformat() if doc.upload_date else None
+            "status": "processing",
+            "chunk_count": 0,
+            "created_at": doc.created_at.isoformat()
         }
     }
 
