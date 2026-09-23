@@ -1,3 +1,13 @@
+---
+title: RAGify Intelligent Document RAG Chatbot
+emoji: 🤖
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # RAGify — Intelligent Document RAG Chatbot
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?logo=python&logoColor=white)](https://python.org)
