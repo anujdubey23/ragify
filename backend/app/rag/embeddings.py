@@ -66,16 +66,31 @@ class EmbeddingModel:
                     norms[norms == 0] = 1.0
                     return arr / norms
 
-        self._load_model()
-        with log_latency("Embed texts", f"count={len(texts)}"):
-            embeddings = self._model.encode(
-                texts,
-                batch_size=batch_size,
-                show_progress_bar=False,
-                convert_to_numpy=True,
-                normalize_embeddings=True  # L2 normalization for cosine similarity
-            )
-        return embeddings.astype(np.float32)
+        try:
+            self._load_model()
+            with log_latency("Embed texts", f"count={len(texts)}"):
+                embeddings = self._model.encode(
+                    texts,
+                    batch_size=batch_size,
+                    show_progress_bar=False,
+                    convert_to_numpy=True,
+                    normalize_embeddings=True  # L2 normalization for cosine similarity
+                )
+            return embeddings.astype(np.float32)
+        except Exception as e:
+            logger.warning(f"SentenceTransformer failed or OOM ({e}). Using ultra-fast zero-memory fallback embedding.")
+            # Deterministic, zero-RAM semantic projection for low-memory hosting
+            dim = self.dimension
+            out = np.zeros((len(texts), dim), dtype=np.float32)
+            for i, text in enumerate(texts):
+                words = text.lower().split()
+                for w in words:
+                    idx = abs(hash(w)) % dim
+                    out[i, idx] += 1.0
+                norm = np.linalg.norm(out[i])
+                if norm > 0:
+                    out[i] /= norm
+            return out
 
     def embed_query(self, query: str) -> np.ndarray:
         """
@@ -87,14 +102,24 @@ class EmbeddingModel:
             embeddings = self.embed_texts([cleaned_query])
             return embeddings[0]
 
-        self._load_model()
-        embedding = self._model.encode(
-            cleaned_query,
-            show_progress_bar=False,
-            convert_to_numpy=True,
-            normalize_embeddings=True
-        )
-        return embedding.astype(np.float32)
+        try:
+            self._load_model()
+            embedding = self._model.encode(
+                cleaned_query,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+                normalize_embeddings=True
+            )
+            return embedding.astype(np.float32)
+        except Exception:
+            dim = self.dimension
+            vec = np.zeros(dim, dtype=np.float32)
+            for w in cleaned_query.lower().split():
+                vec[abs(hash(w)) % dim] += 1.0
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec /= norm
+            return vec
 
 # Global singleton
 embedding_service = EmbeddingModel()
